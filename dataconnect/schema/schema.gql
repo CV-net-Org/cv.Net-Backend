@@ -1,4 +1,5 @@
 type User @table {
+  id: String! 
   fullName: String!
   email: String!
   employmentStatus: String!
