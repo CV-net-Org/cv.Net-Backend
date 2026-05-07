@@ -7,3 +7,7 @@ public class SignupRequest
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
 }
+public class GoogleAuthRequest
+{
+    public string IdToken { get; set; } = string.Empty;
+}

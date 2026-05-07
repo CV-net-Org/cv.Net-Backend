@@ -1,0 +1,13 @@
+Open Postman and create a new POST request to http://localhost:8000/extract-cv.
+
+Go to the Body tab and select form-data.
+
+Key 1: Type user_id. In the Value column, paste your Firebase UID (e.g., 7078Qxle...).
+
+Key 2: Type file.
+
+CRITICAL: Hover over the right side of the "file" key box. A dropdown will appear that says "Text". Change it to File.
+
+Value 2: A "Select Files" button will appear. Click it and upload your CV.pdf.
+
+Click Send.
