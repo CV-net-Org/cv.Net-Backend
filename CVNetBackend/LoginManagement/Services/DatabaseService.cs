@@ -4,7 +4,8 @@ namespace CVNetBackend.LoginManagement.Services;
 
 public class DatabaseService
 {
-    private readonly string _connString = "Host=35.245.28.42;Username=postgres;Password=CV.Net2026@capstone;Database=cvnet2026-capstone-2-database";
+    private readonly string _connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") 
+                                          ?? "Host=localhost;Username=postgres;Password=password;Database=cvnet_local";
     
     // 1. Existing method for Email/Password Signup
     public async Task SaveToPostgres(string uid, string firstName, string lastName, string email)

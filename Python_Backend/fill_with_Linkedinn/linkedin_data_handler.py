@@ -1,3 +1,5 @@
+import os
+
 import psycopg2
 from psycopg2.extras import execute_values
 import logging
@@ -5,11 +7,11 @@ import logging
 class LinkedInDataHandler:
     def __init__(self):
         self.conn_params = {
-            "dbname": "cvnet2026-capstone-2-database",
-            "user": "postgres",
-            "password": "CV.Net2026@capstone",
-            "host": "35.245.28.42",
-            "port": "5432"
+            "dbname": os.getenv("DB_NAME"),
+            "user": os.getenv("DB_USER"),
+            "password": os.getenv("DB_PASSWORD"),
+            "host": os.getenv("DB_HOST"),
+            "port": os.getenv("DB_PORT")
         }
 
     def merge_data(self, user_id, data):

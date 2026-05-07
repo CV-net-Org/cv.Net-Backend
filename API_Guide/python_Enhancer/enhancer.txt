@@ -1,0 +1,14 @@
+Method: POST
+
+URL: http://localhost:8000/ai/enhance
+
+Body (form-data):
+
+text  ::  "I worked on a project using Python and it was very good...  -->  "The raw text from the user.
+
+mode :: formalize / summarize / custom
+
+if use custom
+    - instruction
+    - "Make this sound like a cybersecurity expert."
+    - (Optional) Only used when mode is custom.
