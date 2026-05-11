@@ -23,6 +23,7 @@ type User @table {
   id: UUID! @default(expr: "uuid_generate_v4()")
   fullName: String!
   email: String! @unique
+  gpa: Float
   phone: String
   address: String
   portfolioUrl: String
