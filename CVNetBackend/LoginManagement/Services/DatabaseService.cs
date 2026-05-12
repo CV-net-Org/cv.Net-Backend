@@ -4,13 +4,24 @@ namespace CVNetBackend.LoginManagement.Services;
 
 public class DatabaseService
 {
-    private readonly string _connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") 
-                                          ?? "Host=localhost;Username=postgres;Password=password;Database=cvnet_local";
-    
-    // 1. Existing method for Email/Password Signup
+    private readonly string _connectionString;
+
+    public DatabaseService()
+    {
+        // Pulling from your new 5-variable .env structure
+        string host = Environment.GetEnvironmentVariable("DB_HOST");
+        string user = Environment.GetEnvironmentVariable("DB_USER");
+        string password = Environment.GetEnvironmentVariable("DB_PASSWORD");
+        string database = Environment.GetEnvironmentVariable("DB_NAME");
+        string port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
+
+        // Building the official Npgsql connection string
+        _connectionString = $"Host={host};Port={port};Username={user};Password={password};Database={database};";
+    }
+
     public async Task SaveToPostgres(string uid, string firstName, string lastName, string email)
     {
-        using var conn = new NpgsqlConnection(_connString);
+        using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
 
         var sql = @"
@@ -28,14 +39,11 @@ public class DatabaseService
         await cmd.ExecuteNonQueryAsync();
     }
 
-        // 2. New method for Google Auth Sync (Upsert)
     public async Task UpsertUserToPostgres(string uid, string email, string fullName)
     {
-        using var conn = new NpgsqlConnection(_connString);
+        using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
 
-        // 'ON CONFLICT (id) DO UPDATE' ensures that every login 
-        // refreshes the user's basic info in your PostgreSQL database.
         var sql = @"
             INSERT INTO public.""user"" (id, email, full_name, employment_status, created_at, updated_at)
             VALUES (@id, @email, @fullName, 'Unspecified', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
