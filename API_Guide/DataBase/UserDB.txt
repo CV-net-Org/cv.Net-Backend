@@ -24,6 +24,7 @@ type User @table {
   fullName: String!
   email: String! @unique
   gpa: Float
+  jobrole: String
   phone: String
   address: String
   portfolioUrl: String

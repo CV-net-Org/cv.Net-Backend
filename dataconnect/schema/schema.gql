@@ -4,6 +4,7 @@ type User @table {
   email: String!
   employmentStatus: String!
   gpa: Float
+  jobrole: String
   createdAt: Timestamp!
   updatedAt: Timestamp!
   phone: String
