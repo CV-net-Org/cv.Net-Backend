@@ -15,6 +15,7 @@ type User @table {
   personalStatement: String
   aboutMe: String
   profileImageUrl: String
+  agreement: String
 }
 
 type SocialLink @table {

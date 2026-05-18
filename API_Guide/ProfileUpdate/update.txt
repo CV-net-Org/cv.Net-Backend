@@ -1,0 +1,7 @@
+http://localhost:5167/api/Profile/upload-image
+
+Body
+
+userId: Text
+
+file: file

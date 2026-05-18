@@ -6,6 +6,8 @@ using dotenv.net;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using CVNetBackend.ProfileHandler;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,7 +21,6 @@ Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", keyPath);
 // 2. INITIALIZE FIREBASE ADMIN
 if (File.Exists(keyPath))
 {
-    // Fix: Use FromJson with File.ReadAllText to avoid the obsolete warning
     var json = File.ReadAllText(keyPath);
     FirebaseApp.Create(new AppOptions()
     {
@@ -27,19 +28,46 @@ if (File.Exists(keyPath))
     });
 }
 
+// --- NEW: CONFIGURE CORS ---
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CVNetCorsPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000") // Your Next.js local URL
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
+// --- NEW: CONFIGURE JWT AUTHENTICATION (FIREBASE) ---
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = "https://securetoken.google.com/cvnet2026-capstone";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = "https://securetoken.google.com/cvnet2026-capstone",
+            ValidateAudience = true,
+            ValidAudience = "cvnet2026-capstone",
+            ValidateLifetime = true
+        };
+    });
+
+// 3. RATE LIMITING
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("api-limiter", opt =>
     {
         opt.Window = TimeSpan.FromMinutes(1);
-        opt.PermitLimit = 5; // Allow only 5 requests per minute per user
+        opt.PermitLimit = 5; 
         opt.QueueLimit = 2;
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
     });
 });
 
-// 3. REGISTER SERVICES
+// 4. REGISTER SERVICES
 builder.Services.AddSingleton<DatabaseService>();
 builder.Services.AddSingleton<FirestoreService>();
 builder.Services.AddSingleton<EnhancerService>();
@@ -57,8 +85,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseAuthorization();
-app.MapControllers();
+// --- CRITICAL: MIDDLEWARE ORDER ---
+app.UseCors("CVNetCorsPolicy"); // 1. Allow access from Next.js
+app.UseAuthentication();        // 2. Verify the Token
+app.UseAuthorization();         // 3. Check Permissions
 
 app.MapControllers().RequireRateLimiting("api-limiter");
 

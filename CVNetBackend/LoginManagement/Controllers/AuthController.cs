@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using FirebaseAdmin.Auth;
 using CVNetBackend.LoginManagement.Models;
 using CVNetBackend.Services;
+using System.Security.Claims;
 
 namespace CVNetBackend.LoginManagement.Controllers;
 
@@ -9,28 +11,36 @@ namespace CVNetBackend.LoginManagement.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly DatabaseService _db = new();
-    private readonly FirestoreService _fs = new();
+    private readonly DatabaseService _db;
+    private readonly FirestoreService _fs;
+
+    public AuthController(DatabaseService db, FirestoreService fs)
+    {
+        _db = db;
+        _fs = fs;
+    }
 
     [HttpPost("signup")]
+    [Authorize] // 👈 FORCE token verification before processing data
     public async Task<IActionResult> SignUp([FromBody] SignupRequest request)
     {
+        if (request.Agreement != "Agreed")
+            return BadRequest(new { error = "Terms and Privacy Policy must be accepted." });
+
         try
         {
-            var userArgs = new UserRecordArgs
-            {
-                Email = request.Email,
-                Password = request.Password,
-                DisplayName = $"{request.FirstName} {request.LastName}"
-            };
-            var userRecord = await FirebaseAuth.DefaultInstance.CreateUserAsync(userArgs);
+            // 👈 SECURELY EXTRACT THE REAL UID FROM THE VALIDATED TOKEN
+            var uid = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(uid))
+                return Unauthorized(new { error = "Identity token validation failed." });
 
-            await _fs.CreateUserDocument(userRecord.Uid, request.FirstName, request.LastName, request.Email);
+            // 1. Sync to Firestore (Pass the verified UID)
+            await _fs.CreateUserDocument(uid, request.FirstName, request.LastName, request.Email, request.Agreement);
             
-            // Updated to use the unified method name
-            await _db.UpsertUserToPostgres(userRecord.Uid, request.Email, $"{request.FirstName} {request.LastName}");
+            // 2. Sync to PostgreSQL (Pass the verified UID)
+            await _db.UpsertUserToPostgres(uid, request.Email, $"{request.FirstName} {request.LastName}", request.Agreement);
 
-            return Ok(new { message = "User successfully created everywhere!", uid = userRecord.Uid });
+            return Ok(new { message = "User successfully synchronized everywhere!", uid = uid });
         }
         catch (Exception ex)
         {
@@ -46,7 +56,6 @@ public class AuthController : ControllerBase
             FirebaseToken decodedToken = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(request.IdToken);
             string uid = decodedToken.Uid;
             
-            // Fixed null warnings by providing fallback empty strings
             string email = decodedToken.Claims.ContainsKey("email") 
                 ? decodedToken.Claims["email"]?.ToString() ?? "" 
                 : "";
@@ -55,18 +64,17 @@ public class AuthController : ControllerBase
                 ? decodedToken.Claims["name"]?.ToString() ?? "CV User" 
                 : "CV User";
 
-            // Triple-Sync: PostgreSQL Upsert
-            await _db.UpsertUserToPostgres(uid, email, name);
+            await _db.UpsertUserToPostgres(uid, email, name, request.Agreement ?? "Agreed");
 
             return Ok(new { 
-                message = "Authentication and Sync Successful!", 
+                message = "Login and Sync Successful!", 
                 uid = uid,
                 email = email
             });
         }
         catch (Exception ex)
         {
-            return Unauthorized(new { error = "Invalid token or sync failed", details = ex.Message });
+            return Unauthorized(new { error = "Authentication failed", details = ex.Message });
         }
     }
 }

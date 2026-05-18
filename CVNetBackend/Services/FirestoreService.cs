@@ -9,20 +9,18 @@ public class FirestoreService
 
     public FirestoreService()
     {
-        // This assumes your GOOGLE_APPLICATION_CREDENTIALS env var is set in Program.cs
+        // Assumes GOOGLE_APPLICATION_CREDENTIALS is set in Program.cs
         _db = FirestoreDb.Create("cvnet2026-capstone");
     }
 
-    // This method will create the field automatically if it's missing
     public async Task UpdateUserField(string userId, string fieldName, object value)
     {
         DocumentReference userRef = _db.Collection(CollectionName).Document(userId);
-        
-        // This will now update "profileImageUrl" to match your schema
         await userRef.UpdateAsync(fieldName, value);
     }
 
-    public async Task CreateUserDocument(string uid, string firstName, string lastName, string email)
+    // UPDATED: Now includes agreement field to match schema
+    public async Task CreateUserDocument(string uid, string firstName, string lastName, string email, string agreement = "Agreed")
     {
         var docRef = _db.Collection(CollectionName).Document(uid);
         var userData = new Dictionary<string, object>
@@ -31,6 +29,7 @@ public class FirestoreService
             { "lastName", lastName },
             { "email", email },
             { "role", "candidate" },
+            { "agreement", agreement }, // Recorded status
             { "createdAt", Timestamp.GetCurrentTimestamp() }
         };
         await docRef.SetAsync(userData);

@@ -1,0 +1,124 @@
+This document serves as the Technical Integration Manual for the CVNet API. It outlines how your Frontend (Next.js) or Testing Client (Postman) interacts with the specialized SchemaHandler and Service layers to manage the 43+ tables in your PostgreSQL database.
+
+I. Global API Configuration
+All requests must target your .NET backend running on Ubuntu.
+
+Base URL: http://localhost:5167/api
+
+Content-Type: application/json
+
+Authentication: Firebase UID (passed as userId or id).
+
+II. User Profile Management (/UserControls)
+The User module handles identity data and professional sections (Skills, Education, etc.).
+
+1. Basic Profile Updates
+Endpoint: PUT /user/profile/update-basics
+
+Purpose: Updates core user fields like phone, address, and GPA.
+
+Request Body (JSON):
+
+JSON
+{
+    "userId": "firebase_uid_123",
+    "phone": "+94771234567",
+    "address": "Colombo, Sri Lanka",
+    "gpa": 3.8
+}
+2. Managing List Sections (Skills, Education, etc.)
+Endpoint: POST /user/sections/add-skill
+
+Purpose: Adds a specific skill to the skill table linked to the user.
+
+Request Body (JSON):
+
+JSON
+{
+    "userId": "firebase_uid_123",
+    "skillName": "Penetration Testing",
+    "level": "Intermediate"
+}
+Note: The level must match your GeneralSkillLevel Enum (Beginner, Intermediate, Expert).
+
+III. Company & Job Management (/CompanyControls)
+This module handles the complex lifecycle of companies and their job requirements.
+
+1. Company Profile Creation
+Endpoint: POST /company/profile/create
+
+Purpose: Registers a new organization.
+
+Request Body (JSON):
+
+JSON
+{
+    "name": "Niranga Tech Solutions",
+    "hrEmail": "hr@nirangatech.com",
+    "employeeCount": "GROWING_51_200",
+    "siteLink": "https://nirangatech.com"
+}
+Constraint: employeeCount must match the EmployeeCountRange Enum.
+
+2. Posting a Job (The Multi-Table Transaction)
+Endpoint: POST /company/jobs/post-job
+
+Purpose: Inserts a job and its requirements (Skills, Exp, Education) into 4 separate tables simultaneously using a SQL Transaction.
+
+Request Body (JSON):
+
+JSON
+{
+    "companyId": "uuid-here",
+    "categoryId": "uuid-here",
+    "title": "Security Engineer",
+    "employmentType": "FULL_TIME",
+    "workplaceType": "HYBRID",
+    "description": "Handle network security audits...",
+    "responsibilities": "Monitor traffic, perform Nmap scans...",
+    "deadline": "2026-12-31T23:59:59Z",
+    "hrEmail": "hr@company.com",
+    "skills": [
+        { "name": "Nmap", "level": "EXPERT" },
+        { "name": "Python", "level": "INTERMEDIATE" }
+    ]
+}
+IV. Data Consistency & Sync Logic
+CVNet uses a Dual-Sync strategy to keep PostgreSQL and Firestore aligned.
+
+1. The Cascade Delete (Hard Wipe)
+When a User or Company is deleted, the backend doesn't just remove one row. It performs a Transaction Loop:
+
+User Delete: Automatically deletes records from experience, skills, projects, and 10+ other tables before removing the user record.
+
+Job Delete: Automatically removes all linked job_skills, job_education, and job_experience records.
+
+2. Auto-Timestamps
+Your schema.gql uses @default(expr: "request.time"). You do not need to send createdAt or updatedAt from Postman; the database generates these on insertion.
+
+V. Frontend Implementation (Next.js Example)
+To call these endpoints from your frontend, use axios or fetch.
+
+JavaScript
+import axios from 'axios';
+
+const updateProfile = async (data) => {
+    try {
+        const response = await axios.put('http://localhost:5167/api/user/profile/update-basics', data);
+        console.log("Success:", response.data);
+    } catch (error) {
+        console.error("Error updating profile:", error.response.data);
+    }
+};
+VI. Postman Testing Workflow
+Environment Setup: Create a Postman Environment with a variable base_url set to http://localhost:5167/api.
+
+Order of Operations:
+
+Step 1: Create a JobCategory via Firebase Data Connect.
+
+Step 2: Create a Company via POST /api/company/profile/create.
+
+Step 3: Use the companyId and categoryId to post a Job via POST /api/company/jobs/post-job.
+
+Validation: If you receive a 28P01 error, check your .env password for PostgreSQL. If you receive a 42703 error, verify that you ran firebase deploy --only dataconnect to update your SQL columns.
