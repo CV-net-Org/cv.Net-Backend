@@ -10,27 +10,27 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using CVNetBackend.JobRoleManager.Services;
 
+// 0. LOAD ENVIRONMENT VARIABLES FIRST!
+// This MUST happen before WebApplication.CreateBuilder so the .NET framework 
+// configuration engine caches your .env variables on startup.
+DotEnv.Load();
+
+var root = Directory.GetCurrentDirectory();
+var dotenvPath = Path.Combine(root, ".env");
+
+if (File.Exists(dotenvPath))
+{
+    Console.WriteLine($"\n✅ [SUCCESS] Loading .env file from: {dotenvPath}\n");
+    DotEnv.Load(options: new DotEnvOptions(envFilePaths: new[] { dotenvPath }));
+}
+else
+{
+    Console.WriteLine($"\n🚨 [CRITICAL WARNING] No .env file found at: {dotenvPath} - Database will fail!\n");
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 0. LOAD ENVIRONMENT VARIABLES
-dotenv.net.DotEnv.Load();
-
-// 1. SET ENVIRONMENT VARIABLE FOR GOOGLE SDK
-var keyPath = Path.Combine(builder.Environment.ContentRootPath, "firebase-key.json");
-Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", keyPath);
-
-// 2. INITIALIZE FIREBASE ADMIN
-if (File.Exists(keyPath))
-{
-    var json = File.ReadAllText(keyPath);
-    FirebaseApp.Create(new AppOptions()
-    {
-        Credential = GoogleCredential.FromJson(json)
-    });
-}
-
-// --- NEW: CONFIGURE CORS ---
+// --- CONFIGURE CORS ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CVNetCorsPolicy", policy =>
@@ -42,7 +42,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// --- NEW: CONFIGURE JWT AUTHENTICATION (FIREBASE) ---
+// --- CONFIGURE JWT AUTHENTICATION (FIREBASE) ---
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -74,17 +74,17 @@ builder.Services.AddRateLimiter(options =>
 // 💡 SCOPED LIFETIMES: Required for anything executing isolated database tasks per-request
 builder.Services.AddScoped<DatabaseService>();     
 builder.Services.AddScoped<ProfileService>();      
-builder.Services.AddScoped<SkillMatrixEngine>();   // Shortened cleanly since you added the 'using' block at the top!
+builder.Services.AddScoped<SkillMatrixEngine>();   
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<DashboardService>();
 
 // 💡 SINGLETON LIFETIMES: Safe for cross-cutting context providers or pure computational utilities
 builder.Services.AddSingleton<FirestoreService>();
 builder.Services.AddSingleton<EnhancerService>();
-builder.Services.AddScoped<UserService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 
 var app = builder.Build();
 

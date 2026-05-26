@@ -1,4 +1,8 @@
 using Google.Cloud.Firestore;
+using Google.Apis.Auth.OAuth2;
+using Google.Cloud.Firestore.V1;
+using Grpc.Core;
+using Grpc.Auth;
 
 namespace CVNetBackend.Services;
 
@@ -9,8 +13,22 @@ public class FirestoreService
 
     public FirestoreService()
     {
-        // Assumes your GOOGLE_APPLICATION_CREDENTIALS env var is set in Program.cs
-        _db = FirestoreDb.Create("cvnet2026-capstone");
+        // ✅ FIX: Explicit path mapping to your local credentials file in the current working directory
+        string keyPath = Path.Combine(Directory.GetCurrentDirectory(), "firebase-key.json");
+
+        if (!File.Exists(keyPath))
+        {
+            throw new FileNotFoundException($"[FIRESTORE ERROR] Security initialization failed. keyPath not found at: {keyPath}");
+        }
+
+        // ✅ Explicitly load credentials to bypass the Google ADC environment variable requirement
+        var credential = GoogleCredential.FromFile(keyPath);
+        
+        _db = new FirestoreDbBuilder
+        {
+            ProjectId = "cvnet2026-capstone", // Your target project id matching authority configurations
+            Credential = credential
+        }.Build();
     }
 
     /// <summary>

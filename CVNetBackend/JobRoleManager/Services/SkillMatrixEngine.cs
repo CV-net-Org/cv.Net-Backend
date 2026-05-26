@@ -11,142 +11,89 @@ public class SkillMatrixEngine
 
     public SkillMatrixEngine(IConfiguration configuration)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection") 
-            ?? throw new ArgumentNullException(nameof(configuration));
+        string host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+        string port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
+        string db = Environment.GetEnvironmentVariable("DB_NAME") ?? "postgres"; 
+        string user = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
+        string pass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres";
+        
+        _connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};";
     }
 
     private double GetLevelPercentage(string level)
     {
-        return level.ToLower().Trim() switch
-        {
-            "beginner" => 8.5,
-            "intermediate" => 34.0,
-            "expert" => 85.0,
-            _ => 0.0
+        return level.ToLower().Trim() switch {
+            "beginner" => 8.5, "intermediate" => 34.0, "expert" => 85.0, _ => 0.0
         };
     }
 
-    public async Task<ReadinessReport> CalculateUserReadinessAsync(string userId)
+    public async Task<ReadinessReport> CalculateUserReadinessAsync(string userId, string? profileId = null)
     {
         using IDbConnection db = new NpgsqlConnection(_connectionString);
 
-        // 1. Fetch user's registered job role and the parent category data
+        // ✅ FIX: Pure snake_case
         const string userProfileQuery = @"
-            SELECT u.id, u.job_role, c.name as category_name, c.skills as category_skills, c.id as category_id
-            FROM public.""user"" u
-            JOIN public.job_categories c ON u.job_category_id = c.id
-            WHERE u.id = @UserId LIMIT 1;";
+            SELECT p.id as profile_id, p.job_role, c.name as category_name, c.skills as category_skills, c.id as category_id
+            FROM public.target_role_profiles p
+            LEFT JOIN (
+                SELECT DISTINCT job_role, job_category_id 
+                FROM public.general_skills
+            ) g ON g.job_role = p.job_role
+            LEFT JOIN public.job_categories c ON c.id = g.job_category_id
+            JOIN public.""user"" u ON p.user_id = u.id
+            WHERE p.user_id = @UserId AND (p.id = @ProfileId::uuid OR @ProfileId IS NULL)
+            LIMIT 1;";
 
-        var profileMeta = await db.QueryFirstOrDefaultAsync<dynamic>(userProfileQuery, new { UserId = userId });
+        var profileMeta = await db.QueryFirstOrDefaultAsync<dynamic>(userProfileQuery, new { UserId = userId, ProfileId = profileId });
 
-        // ✅ Strong explicit validation guards clear out all CS8602 warnings safely
-        if (profileMeta == null || profileMeta.job_role == null || profileMeta.category_id == null)
-            throw new Exception("User profile details or assigned industry track relations are unassigned.");
+        if (profileMeta == null) return new ReadinessReport { JobRole = "General", JobCategory = "General", UserReadinessScore = 0 };
 
-        string activeRole = (string)profileMeta.job_role;
+        string activeRole = (string)(profileMeta.job_role ?? "General");
         string categoryName = (string)(profileMeta.category_name ?? "General");
-        Guid categoryId = (Guid)profileMeta.category_id;
-        string[] categoryBaselineSkills = profileMeta.category_skills ?? Array.Empty<string>();
+        string[] categoryBaselineSkills = profileMeta.category_skills is string[] arr ? arr : Array.Empty<string>();
 
-        // 2. Fetch all role-specific requirements out of GeneralSkill
-        const string generalSkillsQuery = @"
-            SELECT skill_name, level 
-            FROM public.general_skills 
-            WHERE LOWER(job_role) = LOWER(@JobRole) AND job_category_id = @CategoryId;";
+        const string generalSkillsQuery = "SELECT skill_name, level FROM public.general_skills WHERE LOWER(job_role) = LOWER(@JobRole);";
+        var roleSpecificSkills = (await db.QueryAsync<dynamic>(generalSkillsQuery, new { JobRole = activeRole })).ToList();
+
+        var profileUuid = (Guid)profileMeta.profile_id;
         
-        var roleSpecificSkills = (await db.QueryAsync<dynamic>(generalSkillsQuery, new { JobRole = activeRole, CategoryId = categoryId })).ToList();
+        const string userSkillsQuery = @"SELECT skill_name as skillName, level FROM public.skill WHERE profile_id = @ProfileId::uuid;";
+        var userClaimedSkills = (await db.QueryAsync<dynamic>(userSkillsQuery, new { ProfileId = profileUuid }))
+            .ToDictionary(k => ((string)k.skillname).ToLower().Trim(), v => (string)v.level);
 
-        // 3. Fetch user's personal current claimed skills from singular table layout
-        const string userSkillsQuery = @"
-            SELECT skill_name, level 
-            FROM public.skill 
-            WHERE user_id = @UserId;";
-        
-        var userClaimedSkills = (await db.QueryAsync<dynamic>(userSkillsQuery, new { UserId = userId }))
-            .ToDictionary(k => ((string)k.skill_name).ToLower().Trim(), v => (string)v.level);
+        var report = new ReadinessReport { JobRole = activeRole, JobCategory = categoryName };
+        double totalIndustryPoints = 0; double totalUserPoints = 0;
+        var evaluatedTracker = new HashSet<string>();
 
-        var report = new ReadinessReport
+        foreach (var skill in categoryBaselineSkills.Concat(roleSpecificSkills.Select(s => (string)s.skill_name)))
         {
-            JobRole = activeRole,
-            JobCategory = categoryName
-        };
+            if (string.IsNullOrEmpty(skill) || !evaluatedTracker.Add(skill.ToLower())) continue;
+            
+            double expectedPercent = 34.0;
+            var specMatch = roleSpecificSkills.FirstOrDefault(s => ((string)s.skill_name).ToLower() == skill.ToLower());
+            if (specMatch != null) expectedPercent = GetLevelPercentage(specMatch.level);
 
-        double totalIndustryPoints = 0;
-        double totalUserPoints = 0;
-        var evaluatedSkillsTracker = new HashSet<string>();
-
-        // --- LAYER 1: Process Category Common Baseline Skills (Defaulted to Intermediate) ---
-        foreach (var skill in categoryBaselineSkills)
-        {
-            string cleanSkill = skill.Trim();
-            if (string.IsNullOrEmpty(cleanSkill) || !evaluatedSkillsTracker.Add(cleanSkill.ToLower())) continue;
-
-            double expectedPercent = 34.0; 
             double userPercent = 0.0;
             string userLevel = "Missing";
-
-            if (userClaimedSkills.TryGetValue(cleanSkill.ToLower(), out var claimedLevel))
-            {
-                userLevel = claimedLevel;
-                double rawUserPercent = GetLevelPercentage(claimedLevel);
-                userPercent = Math.Min(rawUserPercent, expectedPercent);
+            if (userClaimedSkills.TryGetValue(skill.ToLower(), out var claimed)) {
+                userLevel = claimed;
+                userPercent = Math.Min(GetLevelPercentage(claimed), expectedPercent);
             }
 
             totalIndustryPoints += expectedPercent;
             totalUserPoints += userPercent;
 
-            report.Breakdown.Add(new SkillCalculationDetail
-            {
-                SkillName = cleanSkill,
-                RequirementSource = "Category Baseline",
-                ExpectedLevel = "Intermediate",
-                ExpectedPercentage = expectedPercent,
-                UserDeclaredLevel = userLevel,
-                UserCalculatedPercentage = userPercent
+            report.Breakdown.Add(new SkillCalculationDetail {
+                SkillName = skill, RequirementSource = specMatch != null ? "Role Specific" : "Category Baseline",
+                ExpectedLevel = specMatch != null ? specMatch.level : "Intermediate", ExpectedPercentage = expectedPercent,
+                UserDeclaredLevel = userLevel, UserCalculatedPercentage = userPercent
             });
         }
 
-        // --- LAYER 2: Process Specialized Role-Specific Skills ---
-        foreach (var specSkill in roleSpecificSkills)
-        {
-            if (specSkill.skill_name == null) continue;
-            string skillName = ((string)specSkill.skill_name).Trim();
-            if (!evaluatedSkillsTracker.Add(skillName.ToLower())) continue; 
-
-            string expectedLevel = specSkill.level ?? "Intermediate";
-            double expectedPercent = GetLevelPercentage(expectedLevel);
-            double userPercent = 0.0;
-            string userLevel = "Missing";
-
-            if (userClaimedSkills.TryGetValue(skillName.ToLower(), out var claimedLevel))
-            {
-                userLevel = claimedLevel;
-                double rawUserPercent = GetLevelPercentage(claimedLevel);
-                userPercent = Math.Min(rawUserPercent, expectedPercent);
-            }
-
-            totalIndustryPoints += expectedPercent;
-            totalUserPoints += userPercent;
-
-            report.Breakdown.Add(new SkillCalculationDetail
-            {
-                SkillName = skillName,
-                RequirementSource = "Role Specific",
-                ExpectedLevel = expectedLevel,
-                ExpectedPercentage = expectedPercent,
-                UserDeclaredLevel = userLevel,
-                UserCalculatedPercentage = userPercent
-            });
+        if (report.Breakdown.Count > 0) {
+            report.IndustryTargetBenchmark = Math.Round(totalIndustryPoints / report.Breakdown.Count, 2);
+            report.UserReadinessScore = Math.Round(totalUserPoints / report.Breakdown.Count, 2);
         }
-
-        // --- LAYER 3: Aggregate Averages ---
-        int totalUniqueSkills = report.Breakdown.Count;
-        if (totalUniqueSkills > 0)
-        {
-            report.IndustryTargetBenchmark = Math.Round(totalIndustryPoints / totalUniqueSkills, 2);
-            report.UserReadinessScore = Math.Round(totalUserPoints / totalUniqueSkills, 2);
-        }
-
         return report;
     }
 }
