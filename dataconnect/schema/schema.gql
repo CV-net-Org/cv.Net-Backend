@@ -4,25 +4,33 @@ type User @table {
   email: String!
   employmentStatus: String!
   gpa: Float
-  jobrole: String
   createdAt: Timestamp!
   updatedAt: Timestamp!
   phone: String
   address: String
-  portfolioUrl: String
-  currentOrg: String
-  currentPosition: String
-  personalStatement: String
-  aboutMe: String
   profileImageUrl: String
   agreement: String
   appliedJobs: Int @default(value: 0)
   callsForInterview: Int @default(value: 0)
   rejectedJobs: Int @default(value: 0)
+  defaultProfileId: UUID
+}
+
+type TargetRoleProfile @table(name: "target_role_profiles") {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User! @ref
+  jobRole: String!
+  portfolioUrl: String
+  currentOrg: String
+  currentPosition: String
+  personalStatement: String
+  aboutMe: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
 }
 
 type SocialLink @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   platformName: String!
   profileUrl: String!
   createdAt: Timestamp!
@@ -30,7 +38,7 @@ type SocialLink @table {
 }
 
 type Skill @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   skillName: String!
   level: String! # Enum: `Beginner`, `Intermediate`, `Expert`
   createdAt: Timestamp!
@@ -38,7 +46,7 @@ type Skill @table {
 }
 
 type Experience @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   companyName: String!
   startDate: Date!
   roleDescription: String!
@@ -48,7 +56,7 @@ type Experience @table {
 }
 
 type Education @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   degreeTitle: String!
   fieldOfStudy: String!
   organization: String!
@@ -62,7 +70,7 @@ type Education @table {
 }
 
 type Project @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   name: String!
   description: String!
   timePeriod: String!
@@ -74,7 +82,7 @@ type Project @table {
 }
 
 type Publication @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   title: String!
   description: String!
   sourceLink: String!
@@ -85,7 +93,7 @@ type Publication @table {
 }
 
 type Certification @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   organization: String!
   field: String!
   issueDate: Date!
@@ -94,14 +102,14 @@ type Certification @table {
 }
 
 type Membership @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   organizationName: String!
   createdAt: Timestamp!
   updatedAt: Timestamp!
 }
 
 type Language @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   languageName: String!
   proficiency: String! # Enum: `Beginner`, `Intermediate`, `Expert`
   createdAt: Timestamp!
@@ -109,7 +117,7 @@ type Language @table {
 }
 
 type TeachingExperience @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   coursesTaught: String!
   organization: String!
   timePeriod: String!
@@ -119,7 +127,7 @@ type TeachingExperience @table {
 }
 
 type ResearchExperience @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   projectName: String!
   organization: String!
   resultsDescription: String!
@@ -130,7 +138,7 @@ type ResearchExperience @table {
 }
 
 type Award @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   awardName: String!
   organization: String!
   description: String!
@@ -139,7 +147,7 @@ type Award @table {
 }
 
 type Volunteer @table {
-  user: User!
+  profile: TargetRoleProfile! @ref
   organization: String!
   role: String!
   description: String!
@@ -245,6 +253,7 @@ type JobEducationRequirement @table(name: "job_education") {
 type JobApplication @table(name: "job_applications") {
   id: UUID! @default(expr: "uuidV4()")
   user: User! @ref
+  profile: TargetRoleProfile! @ref
   job: Job! @ref
   appliedDate: Timestamp! @default(expr: "request.time")
   status: String @default(value: "Pending")
@@ -253,15 +262,15 @@ type JobApplication @table(name: "job_applications") {
 type HiredRecord @table(name: "hired_records") {
   id: UUID! @default(expr: "uuidV4()")
   user: User! @ref
+  profile: TargetRoleProfile! @ref
   job: Job! @ref
   hiredDate: Timestamp! @default(expr: "request.time")
 }
 
-
-
 type CallForInterview @table(name: "call_for_interviews") {
   id: UUID! @default(expr: "uuidV4()")
   user: User! @ref
+  profile: TargetRoleProfile! @ref
   job: Job! @ref
   interviewDate: Timestamp
   message: String
@@ -271,6 +280,7 @@ type CallForInterview @table(name: "call_for_interviews") {
 type RejectRecord @table(name: "reject_records") {
   id: UUID! @default(expr: "uuidV4()")
   user: User! @ref
+  profile: TargetRoleProfile! @ref
   job: Job! @ref
   reason: String
   rejectedDate: Timestamp! @default(expr: "request.time")
