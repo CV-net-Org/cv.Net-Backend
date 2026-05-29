@@ -25,6 +25,7 @@ type TargetRoleProfile @table(name: "target_role_profiles") {
   currentPosition: String
   personalStatement: String
   aboutMe: String
+  cvUrl: String
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")
 }

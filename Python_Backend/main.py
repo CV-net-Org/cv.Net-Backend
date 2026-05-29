@@ -11,8 +11,6 @@ from Cv_handle.DataHandler import DataHandler as PDFDataHandler
 from fill_with_Linkedinn.linkedin_service import get_linkedin_data, map_linkedin_to_schema
 from fill_with_Linkedinn.linkedin_data_handler import LinkedInDataHandler
 
-# 2. Import the new Enhancer service
-from Enhanser.enhancer_service import enhance_text_with_ai
 
 app = FastAPI()
 
@@ -48,30 +46,45 @@ async def process_cv(user_id: str = Form(...), file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- ENDPOINT 2: LINKEDIN SYNC (PILOTERR) ---
+# --- ENDPOINT 2: LINKEDIN SYNC (PILOTERR) ---
 @app.post("/sync-linkedin")
 async def sync_linkedin(user_id: str = Form(...), profile_url: str = Form(...)):
+    print(f"\n--- STARTING LINKEDIN SYNC ---")
+    print(f"User ID: {user_id}")
+    print(f"Target URL: {profile_url}")
+    
     try:
-        # Scrape and Map
+        # 1. Scrape
+        print("1. Fetching LinkedIn Data from Piloterr...")
         raw_data = get_linkedin_data(profile_url)
+        if not raw_data:
+            print("❌ FAILURE: Piloterr returned empty or invalid data.")
+            raise HTTPException(status_code=500, detail="Failed to scrape data from LinkedIn.")
+        print(f"   -> Successfully fetched data. Payload size: {len(str(raw_data))} bytes")
+
+        # 2. Map
+        print("2. Sending data to AI for Schema Mapping...")
         structured_data = map_linkedin_to_schema(raw_data)
-        
-        # Smart Merge to PostgreSQL (Additive mode)
+        if not structured_data:
+            print("❌ FAILURE: AI Mapping returned None. Check AI logs.")
+            raise HTTPException(status_code=500, detail="AI data mapping failed.")
+        print(f"   -> AI Mapping successful. Found {len(structured_data.get('experience', []))} experience records.")
+
+        # 3. Merge
+        print("3. Executing Smart Merge to PostgreSQL...")
         li_handler = LinkedInDataHandler()
         success = li_handler.merge_data(user_id, structured_data)
         
-        return {"status": "success", "message": "LinkedIn Merged", "data": structured_data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        if not success:
+            print("❌ FAILURE: Database merge aborted (likely missing active profile).")
+            raise HTTPException(status_code=500, detail="Database merge failed. User profile might not exist.")
 
-# --- ENDPOINT 3: AI TEXT ENHANCER (MISTRAL-NEMOTRON) ---
-@app.post("/ai/enhance")
-async def enhance_text_endpoint(
-    text: str = Form(...), 
-    mode: str = Form(...), # 'summarize', 'formalize', or 'custom'
-    instruction: str = Form(None)
-):
-    result = enhance_text_with_ai(text, mode, instruction)
-    return {"status": "success", "enhanced_text": result}
+        print("✅ LINKEDIN SYNC COMPLETELY SUCCESSFUL!")
+        return {"status": "success", "message": "LinkedIn Merged", "data": structured_data}
+        
+    except Exception as e:
+        print(f"🔥 CRITICAL EXCEPTION CAUGHT IN MAIN: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- START THE ENGINE ---
 if __name__ == "__main__":

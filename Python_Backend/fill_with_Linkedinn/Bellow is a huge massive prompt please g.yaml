@@ -1,0 +1,152 @@
+Bellow is a huge massive prompt please go with them clearly if there is any dought make sure ask and claryfy them. if u think u got all. Do it.
+I think to make these all workable we need some Backend also please give it too, if it nessary.
+
+in here u can see there are few sections to update, 
+
+- the username 
+
+- bellow to this there is a section as catogairies and role actually this we need tp change bit for the every user in his User table there is a colum as jorole so it that job role is emplty in there plese make a hilighted section to select the jobrole on that can we need to give them a selection list in here we sync that place with the genaralskill tables table's names and we show them these jobs under charagorized section with jobcatogary that the relavent job has related to. In here we need to user a proffesional UI.
+
+- then after he select it show his jobcatogary and selected jobrole as as way that it can chnage in any time, in here we give them a option to select other jobrole too it mean one user can select multiple jobroles,I think you know how we store data about them, we give a option to remove the selected jobrole too but in here when user try to remove a job role we need to make sure and we need to gove his some warnigs, if that selected jobrole already has data under the table
+TargetRoleProfile, on that case first we see is there any data has added under this jobrole id to the TargetRoleProfile table if not remove it but if it has added we says him if youremove this job role all data that added under this jobrole willlost and if he give ok delete all data inder that jobrole ID from the TargetRoleProfile and remove it. but there is anothercase also if this jobrole ID has mentioned in the  JobApplication CallForInterview if it has mentioned tell to user U can not remove it because there is a application is processing under this job role, if it is in HiredRecord tell him you have get some achievements do u really need to delete these al data, if his data is only in RejectRecord ask them do you really need to delete this and then remove the count from appliedJobs , callsForInterview, rejectedJobs (with this appliedJobs , callsForInterview, rejectedJobs sections we mention whole numberic idea how a user ha applied for jobs and there status)
+
+- Under the section Readiness Score lets put some this as Profile Completenes in there what we do is for each and ever user they have sections to fill as 
+fullNameemailemploymentStatusgpacreatedAtupdatedAtphoneaddressprofileImageUrl 
+jobRoleportfolioUrlcurrentOrgcurrentPositionpersonalStatementaboutMe SkillExperienceEducationProjectPublicationCertificationMembershipLanguageTeachingExperienceResearchExperienceAwardVolunteer like sections no, so lets take their completemnes as 100% and lets tel acout its completeness under this section as percentage, and under that there is a text as "Good" lets chnage it to "View" and link it to /cv
+- there is a section as Skill Match so here we follw the logics that we call under the SkillMatrixEngine
+- in the Total Applied Count section we show them a count how many jobs that user has applied under that  current selected jobrole we get it from the JobApplication table
+- then go to the application breakdown:
+in here with using this pychart we show Applied Jobs, Rejects, Request Jobs(Rename it as Interview Called Applications) by the data that we store inside the User Table's appliedJobs callsForInterview, rejectedJobs colums and in there we need to give a option to users expand the breakdown in that case if users has selected for different jobroles show these jobroles these same breakdown with expanded pycharts, in here please ready for 10 different jobs to show it mean in here we have use some colors to demostrate data in the pytcharts no, please ready 10 different colors to do that, it mean if a user has selected 12 job roles and afer he explan his breakdown forst 10 breakdowns should consist with 10 different colors with color pallets and 11 one can be same color pallet to 1st one. In here to sync these data we need to sync data from the database tables JobApplication, CallForInterview, RejectRecord
+- in the Skills Gap Analysis section we put 4 skills from the skills that related with the selected jobrole(Use general skill section to sync assential data) and simply see what is the expect level what is user level and mark it, if industry expect a beginer in the bar's lenght 8% make a mark and show it as expect level and show user mention his real level like example if user says he is intermediate mark 34% of the bar if he says expert mark 85% in the bar, in here there is a color section also if user pass the expected level color the bars complete level in light green, if user has not exeed or equal to expeted level and if he is in beginer while industry expect a expert color in light red, if industry expect interediate and user in beginer color it in orange, it mean there is only 3 sections, if user level is less 2 levels to expected level mark in red if it is 1 level less mark it orage 
+ make other 1 as other skills and in that skills is base on the common skills it mean the skills that has mentioned under the skils that mentoned in JobCategory and accoding to the skills the have metioned show it as a one percentage bar, If u do not undestand how to do the relavent math mart tell me I will explain.
+
+- JobCategory: not time to go to this JobCategory section in here we show them what are the all jobs that they applied recently, in here show the most 5 recent job and its status and under that show the company also, no need to show the percentages and if this section is emplty please display a nice attractive setion to say 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Personal Info
+
+Full Name
+
+Email (Read Only)
+
+Phone
+
+Address
+
+Portfolio Link
+
+GPA
+
+Current Organization
+
+Current Position
+
+Personal Statement
+
+About Me
+
+
+
+Skills
+
+Beginner
+
+Intermediate
+
+Expert
+
++
+
+
+
+Experience
+
+Add Experience
+
+
+
+Education
+
+Add Education
+
+
+
+Social Links
+
+LinkedIn
+
+GitHub
+
+Twitter
+
+Portfolio
+
+Other
+
++
+
+
+
+Projects
+
+Add Project
+
+
+
+Certifications
+
+
+
+
+
+
+
+only these section has setup where is others make sure all other also there make sure backend also there
+
+
+
+
+
+
+
+
+
+
+in this last code base it also has a issue, for the all skills that has mentioned it has mark from orage like I have only added python as expert in here no ther I have added but other skils also has colerup 
+
+
+
+I will tell the logic that need add here A to Z again,
+
+Think there is a user as Softtware Enginear and in the GeneralSkill table under the  ID of Softtware Enginear  there are 10 skills from that 10 show alteast 5 in here and see what is the level of that skill needs to be, in that case some skills will mention beginer some are intermediate and some are expert on that case mark that level in the bar (beginer 8% of the bar intermediate 34% of the bar and expert as 85%) then see the users skills and see is he has this skill or not if not keep that bar without coloring, if he has ckeck its level, and
+
+- if user level => Expected level (expected level mean the level that has mentioned in GeneralSkill table) - color it in light green
+
+- if user level beigener,  and expect level is expert corol in red
+
+- if user level beigener and expect level is intermediate color in orange 
+
+- if user level intermediate and expect level is expert color in orange
+
+
+
+this is about the skills in the GeneralSkill table and for the each job it has a caterory so in this case 5th bar we write as other skills, in that case what we do it we see for that catergory what are the all skills that system look for then think it has mentioned 5 skills then we take those all 5 as one skill section and we do the same that we do in above actually for all these skills we industy expect level is beginer(all same) of in that bar we can mark expect level in the 34% level and accding to user skill update it too I think u can make a calcuation for that if u can not let me know
+
+
+
+do you understand what I need to do 

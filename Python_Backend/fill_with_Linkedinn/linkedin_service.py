@@ -9,7 +9,8 @@ load_dotenv()
 
 client = OpenAI(
     base_url="https://integrate.api.nvidia.com/v1",
-    api_key=os.getenv("API_KEY")
+    api_key=os.getenv("API_KEY"),
+    timeout=60.0 
 )
 
 PILOTERR_API_KEY = os.getenv("PILOTERR_API_KEY")
@@ -60,33 +61,33 @@ def get_linkedin_data(profile_url):
 def map_linkedin_to_schema(raw_data):
     try:
         response = client.chat.completions.create(
-            model="abacusai/dracarys-llama-3.1-70b-instruct",
+            # 2. Swap to the lightning-fast 8B model
+            model="meta/llama-3.1-8b-instruct", 
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Map this LinkedIn data:\n\n{json.dumps(raw_data)}"}
             ],
-            temperature=0
+            temperature=0,
+            max_tokens=2048 # Ensure the model has enough room to write the full JSON
         )
         
         raw_content = response.choices[0].message.content
         
-        # DEBUG: Un-comment the line below to see EXACTLY what the AI is sending in your terminal
-        # print(f"DEBUG AI RAW OUTPUT: {raw_content}")
+        print("\n--- DEBUG: RAW AI OUTPUT ---")
+        print(raw_content)
+        print("----------------------------\n")
 
-        # BETTER EXTRACTION: Look for the first '{' and the last '}'
         match = re.search(r'(\{.*\})', raw_content, re.DOTALL)
         
         if match:
             clean_json = match.group(1)
-            return json.loads(clean_json)
+            parsed_data = json.loads(clean_json)
+            print("✅ JSON successfully parsed from AI output.")
+            return parsed_data
         else:
-            print("❌ Error: No JSON object found in AI response.")
+            print("❌ Error: No JSON object brackets '{ }' found in AI response.")
             return None
 
-    except json.JSONDecodeError as je:
-        print(f"❌ JSON Parsing Failed: {je}")
-        print(f"Content attempted: {raw_content}")
-        return None
     except Exception as e:
-        print(f"❌ Error in AI Mapping: {e}")
+        print(f"❌ Error in AI Mapping request: {e}")
         return None
