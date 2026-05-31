@@ -1,14 +1,20 @@
 import os
 import json
 import re
-from openai import OpenAI
+from openai import OpenAI, APITimeoutError, APIConnectionError
 from dotenv import load_dotenv
 
+# Force load variables
 load_dotenv()
 
+api_key = os.getenv("API_KEY")
+print(f"🔑 [DEBUG AI INIT] Loaded API Key: {'YES (Starts with ' + api_key[:5] + '...)' if api_key else 'NO (None)'}")
+
+# ✅ FIX 1: Increased timeout to 90 seconds to allow massive CV processing
 client = OpenAI(
     base_url="https://integrate.api.nvidia.com/v1",
-    api_key=os.getenv("API_KEY")
+    api_key=api_key,
+    timeout=180.0  
 )
 
 # HR PROFESSIONAL SYSTEM PROMPT - MASTER SCHEMA V2.0
@@ -56,8 +62,11 @@ REQUIRED JSON STRUCTURE:
 
 def map_cv_to_schema(cv_text):
     try:
+        print("🧠 [DEBUG AI] Preparing request to NVIDIA API (meta/llama-3.1-8b-instruct)...")
+        
         response = client.chat.completions.create(
-            model="abacusai/dracarys-llama-3.1-70b-instruct",
+            # ✅ FIX 2: Switched to the highly stable, official Meta Llama model
+            model="meta/llama-3.1-8b-instruct",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Extract data from this CV text:\n\n{cv_text}"}
@@ -65,10 +74,24 @@ def map_cv_to_schema(cv_text):
             temperature=0
         )
         
+        print("🧠 [DEBUG AI] Response received successfully from API!")
         raw_content = response.choices[0].message.content
+        
+        print(f"🧠 [DEBUG AI] Raw Response Snippet: {raw_content[:150]}...")
+        
         # Clean potential markdown fences
         clean_json = re.sub(r"```json| ```", "", raw_content).strip()
         return json.loads(clean_json)
+        
+    except APITimeoutError:
+        print("❌ [ERROR AI] Request to NVIDIA API TIMED OUT after 90 seconds.")
+        return None
+    except APIConnectionError as e:
+        print(f"❌ [ERROR AI] Failed to connect to NVIDIA API (Network issue): {e}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"❌ [ERROR AI] AI returned invalid JSON. Could not parse: {e}")
+        return None
     except Exception as e:
-        print(f"Error in AI Mapping: {e}")
+        print(f"❌ [ERROR AI] Unexpected Error in map_cv_to_schema: {e}")
         return None
