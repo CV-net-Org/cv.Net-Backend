@@ -3,17 +3,22 @@ using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Firestore.V1;
 using Grpc.Core;
 using Grpc.Auth;
+using FirebaseAdmin;
+using FirebaseAdmin.Auth;
 
 namespace CVNetBackend.Services;
 
 public class FirestoreService
 {
     private readonly FirestoreDb _db;
-    private const string CollectionName = "Users";
+    
+    // ✅ CRITICAL FIX: Changed "Users" to "users" (lowercase). 
+    // Firestore is case-sensitive, and your Next.js app relies on the lowercase "users" collection!
+    private const string CollectionName = "users";
 
     public FirestoreService()
     {
-        // ✅ FIX: Explicit path mapping to your local credentials file in the current working directory
+        // Explicit path mapping to your local credentials file in the current working directory
         string keyPath = Path.Combine(Directory.GetCurrentDirectory(), "firebase-key.json");
 
         if (!File.Exists(keyPath))
@@ -21,12 +26,23 @@ public class FirestoreService
             throw new FileNotFoundException($"[FIRESTORE ERROR] Security initialization failed. keyPath not found at: {keyPath}");
         }
 
-        // ✅ Explicitly load credentials to bypass the Google ADC environment variable requirement
+        // Explicitly load credentials to bypass the Google ADC environment variable requirement
         var credential = GoogleCredential.FromFile(keyPath);
+        
+        // ✅ NEW: Fixes the NullReferenceException!
+        // Ensures the global Firebase Authentication instance is strictly initialized before the Controller tries to use it.
+        if (FirebaseApp.DefaultInstance == null)
+        {
+            FirebaseApp.Create(new AppOptions
+            {
+                Credential = credential,
+                ProjectId = "cvnet2026-capstone"
+            });
+        }
         
         _db = new FirestoreDbBuilder
         {
-            ProjectId = "cvnet2026-capstone", // Your target project id matching authority configurations
+            ProjectId = "cvnet2026-capstone", // Your target project id
             Credential = credential
         }.Build();
     }
@@ -80,7 +96,8 @@ public class FirestoreService
         // MergeAll keeps previous additions like custom job roles or bio sections completely safe
         await docRef.SetAsync(userData, SetOptions.MergeAll);
     }
-    // ✅ NEW: Deletes the user document from NoSQL
+    
+    // ✅ Deletes the user document from NoSQL safely
     public async Task DeleteUserDocument(string uid)
     {
         var docRef = _db.Collection(CollectionName).Document(uid);

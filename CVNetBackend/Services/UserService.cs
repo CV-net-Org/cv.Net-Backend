@@ -1,63 +1,79 @@
 using Npgsql;
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace CVNetBackend.Services;
 
 public class UserService
 {
-    private readonly DatabaseService _db;
-    public UserService(DatabaseService db) => _db = db;
+    private readonly string _connString;
+
+    public UserService(IConfiguration config)
+    {
+        // Explicitly build the connection to guarantee it is NEVER null
+        string host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+        string port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
+        string db = Environment.GetEnvironmentVariable("DB_NAME") ?? "postgres";
+        string user = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
+        string pass = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres";
+
+        // Includes the SSL fix we applied earlier!
+        _connString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SslMode=Require;Trust Server Certificate=true;";
+    }
 
     public async Task DeleteFullUserProfile(string uid)
     {
-        using var conn = _db.GetConnection();
+        // Instantiating the connection directly so it cannot be null
+        using var conn = new NpgsqlConnection(_connString);
         await conn.OpenAsync();
+        
         using var trans = await conn.BeginTransactionAsync();
 
-        try {
-            // ✅ FIX: Formatted exactly to match PostgreSQL snake_case table generation
-            // ✅ NEW: Added the job tracking tables (job_applications, call_for_interviews, etc.)
-            string[] profileTables = { 
-                "social_link", 
-                "skill", 
-                "experience", 
-                "education", 
-                "project", 
-                "publication", 
-                "certification", 
-                "membership", 
-                "language", 
-                "teaching_experience", 
-                "research_experience", 
-                "award", 
-                "volunteer",
-                "job_applications",
-                "call_for_interviews",
-                "reject_records",
-                "hired_records"
-            };
+        try 
+        {
+            string sql = @"
+                -- 1. Unlink default profile to prevent foreign key loop crashes
+                UPDATE public.""user"" SET default_profile_id = NULL WHERE id = @uid;
 
-            foreach (var table in profileTables) {
-                // Delete child records where the user_id matches
-                var cmd = new NpgsqlCommand($"DELETE FROM public.\"{table}\" WHERE user_id = @uid", conn, trans);
-                cmd.Parameters.AddWithValue("uid", uid);
-                
-                // We use a try-catch here just in case a table hasn't been synced to the DB yet,
-                // so it doesn't crash the entire deletion process if a table is missing.
-                try {
-                    await cmd.ExecuteNonQueryAsync();
-                } catch (PostgresException ex) when (ex.SqlState == "42P01") {
-                    Console.WriteLine($"[WARNING] Table {table} does not exist yet. Skipping...");
-                }
-            }
+                -- 2. Wipe Job Tracking (These tables use user_id)
+                DELETE FROM public.job_applications WHERE user_id = @uid;
+                DELETE FROM public.hired_records WHERE user_id = @uid;
+                DELETE FROM public.call_for_interviews WHERE user_id = @uid;
+                DELETE FROM public.reject_records WHERE user_id = @uid;
 
-            // Finally, delete the parent user record
-            var userCmd = new NpgsqlCommand("DELETE FROM public.\"user\" WHERE id = @uid", conn, trans);
-            userCmd.Parameters.AddWithValue("uid", uid);
-            await userCmd.ExecuteNonQueryAsync();
+                -- 3. Wipe CV Data Arrays (These tables use profile_id, NOT user_id)
+                DELETE FROM public.skill WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.experience WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.education WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.social_link WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.project WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.publication WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.certification WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.membership WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.language WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.teaching_experience WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.research_experience WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.award WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
+                DELETE FROM public.volunteer WHERE profile_id IN (SELECT id FROM public.target_role_profiles WHERE user_id = @uid);
 
+                -- 4. Delete the Target Profiles
+                DELETE FROM public.target_role_profiles WHERE user_id = @uid;
+
+                -- 5. Delete Root User Account
+                DELETE FROM public.""user"" WHERE id = @uid;
+            ";
+
+            using var cmd = new NpgsqlCommand(sql, conn, trans);
+            cmd.Parameters.AddWithValue("uid", uid);
+            
+            await cmd.ExecuteNonQueryAsync();
             await trans.CommitAsync();
-        } catch {
+        } 
+        catch (Exception ex)
+        {
             await trans.RollbackAsync();
+            Console.WriteLine($"[CRITICAL DELETE ERROR] {ex.Message}");
             throw;
         }
     }
