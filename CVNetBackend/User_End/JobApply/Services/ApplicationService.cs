@@ -296,4 +296,29 @@ var mainData = await conn.QueryFirstOrDefaultAsync<dynamic>(@"
             throw new Exception("Database Error: " + ex.Message);
         }
     }
+    // ✅ ADD THIS METHOD to ApplicationService.cs
+    public async Task<IEnumerable<ApplicationRecordDto>> GetMyApplicationsAsync(string userId)
+    {
+        using var conn = new NpgsqlConnection(_connString);
+        await conn.OpenAsync();
+
+        string sql = @"
+            SELECT 
+                a.id::text as ""Id"", 
+                s.job_role as ""Role"", 
+                c.name as ""Company"", 
+                j.location as ""Location"", 
+                to_char(a.applied_date, 'Mon DD, YYYY') as ""Date"", 
+                a.status as ""Status""
+            FROM public.job_applications a
+            JOIN public.application_snapshots s ON a.snapshot_id = s.id
+            JOIN public.jobs j ON a.job_id = j.id
+            JOIN public.companies c ON j.company_id = c.id
+            WHERE a.user_id = @userId 
+              AND j.status = 1     /* ✅ THIS HIDES CLOSED JOBS */
+            ORDER BY a.applied_date DESC;
+        ";
+
+        return await conn.QueryAsync<ApplicationRecordDto>(sql, new { userId });
+    }
 }

@@ -223,6 +223,7 @@ type Job @table(name: "jobs") {
   description: String!
   responsibilities: String!
   salaryRange: String
+  status: Int @default(value:1)
   currency: String @default(value: "LKR")
   applicationDeadline: Timestamp!
   expireDate: Timestamp!

@@ -64,8 +64,10 @@ public async Task<IEnumerable<CandidateJobListingDto>> GetActiveJobsAsync(string
         FROM public.jobs j
         JOIN public.companies c ON j.company_id = c.id
         JOIN public.job_categories jc ON j.job_category_id = jc.id
-        WHERE j.expire_date > CURRENT_TIMESTAMP
-          -- ✅ DO NOT show jobs the user has already applied for
+        
+        -- ✅ ADDED j.status = 1 TO ENSURE ONLY OPEN JOBS SHOW
+        WHERE j.status = 1 
+          AND j.expire_date > CURRENT_TIMESTAMP
           AND NOT EXISTS (
               SELECT 1 FROM public.job_applications ja 
               WHERE ja.job_id = j.id AND ja.user_id = @userId
@@ -74,5 +76,5 @@ public async Task<IEnumerable<CandidateJobListingDto>> GetActiveJobsAsync(string
     ";
 
     return await conn.QueryAsync<CandidateJobListingDto>(sql, new { userId });
-    }
+}
 }

@@ -62,4 +62,17 @@ public class ApplicationController : ControllerBase
             return Ok(new { message = "Application submitted successfully!" });
         } catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
     }
+    // ✅ ADD THIS ENDPOINT to ApplicationController.cs
+    [HttpGet("my-applications")]
+    public async Task<IActionResult> GetMyApplications()
+    {
+        try {
+            var uid = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (uid == null) return Unauthorized();
+            
+            return Ok(await _appService.GetMyApplicationsAsync(uid));
+        } catch (Exception ex) { 
+            return BadRequest(new { error = ex.Message }); 
+        }
+    }
 }

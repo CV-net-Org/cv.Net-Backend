@@ -28,3 +28,13 @@ public class TargetProfileDropdownDto
     public string JobRole { get; set; } = string.Empty;
     public string PersonalStatement { get; set; } = string.Empty;
 }
+// Add this to the bottom of ApplicationDtos.cs
+public class ApplicationRecordDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string Company { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+}
