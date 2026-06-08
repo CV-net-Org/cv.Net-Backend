@@ -80,6 +80,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<AdminService>();
 
+
 // 💡 SINGLETON LIFETIMES: Safe for cross-cutting context providers or pure computational utilities
 builder.Services.AddSingleton<FirestoreService>();
 builder.Services.AddSingleton<EnhancerService>();
@@ -88,6 +89,7 @@ builder.Services.AddScoped<CVNetBackend.User_End.JobApply.Services.CandidateJobS
 builder.Services.AddScoped<CVNetBackend.User_End.JobApply.Services.ApplicationService>();
 builder.Services.AddScoped<CVNetBackend.Company_End.Services.CompanyProfileService>();
 builder.Services.AddScoped<CVNetBackend.Company_End.JobManagement.Services.CompanyJobService>();
+builder.Services.AddScoped<CVNetBackend.Company_End.ApplicationsView.Services.JobDetailsService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
