@@ -421,3 +421,16 @@ type SnapshotVolunteer @table(name: "snapshot_volunteers") {
   role: String!
   description: String!
 }
+
+type SharedInterviewPortal @table(name: "shared_interview_portals") {
+  id: UUID! @default(expr: "uuidV4()")
+  interviewDate: Date!
+  passwordHash: String!
+  expiresAt: Timestamp!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type SharedPortalJob @table(name: "shared_portal_jobs") {
+  portal: SharedInterviewPortal! @ref
+  job: Job! @ref
+}
