@@ -92,7 +92,7 @@ builder.Services.AddScoped<CVNetBackend.Company_End.JobManagement.Services.Compa
 builder.Services.AddScoped<CVNetBackend.Company_End.ApplicationsView.Services.JobDetailsService>();
 builder.Services.AddScoped<CVNetBackend.Company_End.ApplicationsView.Services.JobDetailsService>();
 builder.Services.AddScoped<CVNetBackend.Company_End.Interviews.Services.InterviewService>();
-
+builder.Services.AddScoped<CVNetBackend.Company_End.Services.CompanyDashboardService>();
 // Add this line right below it!
 builder.Services.AddScoped<CVNetBackend.Company_End.CandidateSection.Services.CandidateService>();
 
