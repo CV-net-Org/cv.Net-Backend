@@ -1,0 +1,32 @@
+
+
+enter to the instance: gcloud sql users set-password postgres --instance=cvnet2026-capstone-instance --password='CV.Net2026@capstone'
+
+initiate: gcloud sql connect cvnet2026-capstone-instance --user=postgres
+Connect: \c  cvnet2026-capstone-2-database
+
+add or change DB with schema.gql: firebase deploy --only dataconnect
+
+
+
+set device ip: gcloud sql instances patch cvnet2026-capstone-instance --authorized-networks=212.104.229.117/32
+
+
+gcloud sql users set-password postgres \
+
+    --instance=cvnet2026-capstone-instance \
+
+    --password=CV.Net2026@capstone
+
+
+clear snapshots: TRUNCATE TABLE public.application_snapshots CASCADE;
+
+Delete: TRUNCATE TABLE public."user" CASCADE;
+
+
+
+
+
+
+
+
